@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Excel to HTML</title>
+  <style>
+    body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    table {
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    
+    th, td {
+      border: 1px solid black;
+      padding: 5px;
+    }
+    .button {
+        cursor: pointer;
+        text-align: center;
+        padding: 4px 8px;
+        border: 1px solid black;
+    }
+    .upload {
+        display: inline-block;
+        background-color:paleturquoise;
+    }
+    .download {
+        display: none;
+        background-color:palegreen;
+    }
+  </style>
+</head>
+<body>
+  <label for="excelFileInput" class="upload button">
+    Dateien auswählen
+  </label>
+  <input type="file" id="excelFileInput" style="display: none" multiple>
+  <div id="downloadButton" class="download button">Download</div>
+  <div id="tablesContainer"></div>
+
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script>
+    function handleFileSelect(event) {
+      var files = event.target.files; // Get the selected files
+      var tablesContainer = document.getElementById('tablesContainer');
+      var parsedDataArray = []; // Array to store parsed data from each file
+
+      // Clear any existing tables
+      tablesContainer.innerHTML = '';
+
+      // Loop through each file
+      for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+
+        // Check if it's an Excel file
+        if (file.type === 'application/vnd.ms-excel' || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+          var reader = new FileReader();
+
+          reader.onload = function (event) {
+            var data = new Uint8Array(event.target.result);
+            var workbook = XLSX.read(data, { type: 'array' });
+
+            workbook.SheetNames.forEach(function (sheetName) {
+              var worksheet = workbook.Sheets[sheetName];
+              var parsedData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+              
+              parsedDataArray.push(parsedData); // Store parsed data in the array
+            });
+
+            // Check if all files have been processed
+            if (parsedDataArray.length === files.length) {
+              // Generate and display the original tables
+              displayOriginalTables();
+              
+              // Generate and display the merged table
+              var mergedData = mergeData();
+              displayMergedTable(mergedData);
+            }
+          };
+
+          reader.readAsArrayBuffer(file);
+        } else {
+          console.log('Invalid file format: ' + file.name);
+        }
+      }
+
+      function displayOriginalTables() {
+        // Loop through each parsed data array
+        for (var j = 0; j < parsedDataArray.length; j++) {
+          var parsedData = parsedDataArray[j];
+          var table = document.createElement('table');
+          var thead = document.createElement('thead');
+          var tbody = document.createElement('tbody');
+
+          // Create table header
+          var headerRow = document.createElement('tr');
+          
+          // Add empty heading cell for row numbering column
+          var emptyHeaderCell = document.createElement('th');
+          headerRow.appendChild(emptyHeaderCell);
+          
+          parsedData[0].forEach(function (cellData, columnIndex) {
+            if (columnIndex !== 0) {
+              var th = document.createElement('th');
+              th.textContent = cellData;
+              headerRow.appendChild(th);
+            }
+          });
+          thead.appendChild(headerRow);
+
+          // Create table rows
+          for (var k = 1; k < parsedData.length; k++) {
+            var dataRow = document.createElement('tr');
+            
+            // Add row number column
+            var rowNumberCell = document.createElement('td');
+            rowNumberCell.textContent = k;
+            dataRow.appendChild(rowNumberCell);
+            
+            parsedData[k].forEach(function (cellData, columnIndex) {
+              if (columnIndex !== 0) {
+                var td = document.createElement('td');
+                td.textContent = cellData;
+                dataRow.appendChild(td);
+              }
+            });
+            tbody.appendChild(dataRow);
+          }
+
+          table.appendChild(thead);
+          table.appendChild(tbody);
+
+          var heading = document.createElement('h2');
+          heading.textContent = files[j].name;
+          tablesContainer.appendChild(heading);
+          tablesContainer.appendChild(table);
+        }
+      }
+
+      function mergeData() {
+        var mergedData = []; // Merged data from all files
+        var rowNumber = 1; // Row number counter
+
+        // Merge data from all files into one array, excluding the header rows after the first file
+        for (var j = 0; j < parsedDataArray.length; j++) {
+          var parsedData = parsedDataArray[j];
+
+          if (j === 0) {
+            mergedData = mergedData.concat(parsedData);
+          } else {
+            mergedData = mergedData.concat(parsedData.slice(1));
+          }
+        }
+
+        // Update the row numbering column
+        mergedData.forEach(function (rowData, rowIndex) {
+          rowData[0] = rowIndex === 0 ? '' : rowNumber++;
+        });
+
+        return mergedData;
+      }
+
+      function displayMergedTable(data) {
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+        var tbody = document.createElement('tbody');
+
+        // Create table header
+        var headerRow = document.createElement('tr');
+        
+        // Add empty heading cell for row numbering column
+        var emptyHeaderCell = document.createElement('th');
+        headerRow.appendChild(emptyHeaderCell);
+        
+        data[0].forEach(function (cellData, columnIndex) {
+          if (columnIndex !== 0) {
+            var th = document.createElement('th');
+            th.textContent = cellData;
+            headerRow.appendChild(th);
+          }
+        });
+        thead.appendChild(headerRow);
+
+        // Create table rows
+        for (var k = 1; k < data.length; k++) {
+          var dataRow = document.createElement('tr');
+          
+          // Add row number column
+          var rowNumberCell = document.createElement('td');
+          rowNumberCell.textContent = data[k][0];
+          dataRow.appendChild(rowNumberCell);
+          
+          data[k].forEach(function (cellData, columnIndex) {
+            if (columnIndex !== 0) {
+              var td = document.createElement('td');
+              td.textContent = cellData;
+              dataRow.appendChild(td);
+            }
+          });
+          tbody.appendChild(dataRow);
+        }
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+
+        var heading = document.createElement('h2');
+        heading.textContent = 'Neue Tabelle';
+        tablesContainer.appendChild(heading);
+        tablesContainer.appendChild(table);
+      }
+
+      function downloadMergedData() {
+        // Generate the merged data
+        var mergedData = mergeData();
+
+        // Create a new workbook
+        var wb = XLSX.utils.book_new();
+
+        // Create worksheet from the merged data
+        var ws = XLSX.utils.aoa_to_sheet(mergedData);
+
+        // Add the worksheet to the workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'Neue Tabelle');
+
+        // Generate Excel file
+        var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+        // Convert workbook to Blob
+        var blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+        // Create a temporary download link
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'neue_tabelle.xlsx';
+
+        // Programmatically click the link to trigger the download
+        link.click();
+      }
+
+      var downloadButton = document.getElementById('downloadButton');
+      downloadButton.style.display = 'inline-block';
+      downloadButton.addEventListener('click', downloadMergedData, false);
+    }
+
+    var excelFileInput = document.getElementById('excelFileInput');
+    excelFileInput.addEventListener('change', handleFileSelect, false);
+  </script>
+</body>
+</html>
